@@ -1,0 +1,495 @@
+\documentclass[fleqn,10pt]{olplainarticle}
+% Use option lineno for line numbers 
+
+\usepackage{siunitx}
+\usepackage{bibentry}
+\usepackage{hyperref}
+\usepackage{listings}
+\newcommand{\ZY}[1]{\textcolor{blue}{#1}}
+\newcommand{\nth}[1]{{#1}^{th}}
+\newcommand{\degree}[0]{^\circ}
+\usepackage{float}
+\nobibliography*
+
+\title{Data-Driven and Physics-Inspired Machine Learning\\[1ex] \large UROP Report U081470}
+
+\author{Saumya Shah}
+
+\keywords{Machine Learning, Symbolic Regression, AI Feynman}
+
+\begin{abstract}
+    This work explores using the physics-inspired AI Feynman symbolic regression algorithm to automatically rediscover a fundamental equation in astronomy - the Equation of the Centre. Through the introduction of observational biases corresponding to the planar and periodic nature of the system through data preprocessing, as well as inductive biases favouring trigonometric functions, AI Feynman was successful in recovering the first-order analytical form of this equation from lunar ephemerides data. The results demonstrate the utility of this method in rediscovering physical equations, but also highlight further challenges in constraining symbolic regression to derive canonical physics equations when leveraging domain knowledge through tailored biases. Improved techniques for embedding relevant physical principles are needed to guide the search toward essential governing equations across scientific fields.
+\end{abstract}
+
+\numberwithin{equation}{subsection}
+\begin{document}
+\maketitle
+
+\flushbottom
+
+\thispagestyle{empty}
+
+\tableofcontents
+
+\section{Introduction}
+
+\emph{AI Feynman} is a physics-inspired symbolic regression algorithm developed by Silviu-Marian Udrescu and Max Tegmark in 2020 \cite{Udrescu2020} shown to be capable of rediscovering one hundred equations from the \emph{Feynman Lectures on Physics}.
+Recent work has shown that, given the manual embedding of inductive and observational biases corresponding to the periodicity of Mars' orbit and the trigonometric nature of the data, AI Feynman can rediscover the orbital equation of Mars \cite{Khoo2023.1}.\\\\
+In this work, we use AI Feynman to find an equation for the lunar orbit, and thus determine the equations for the components of lunar motion and the effects of lunar perturbations. To this end, we use tabulated geocentric ephemerides data from NASA's JPL Horizons System as input to AI Feynman, introducing astronomical observations like the planar and periodic nature of the lunar orbit as observational and inductive biases to rediscover the equation for lunar motion. 
+\\
+% (2) Emulate the rediscovery of Kepler's second law of planetary motion by using AI Feynman to rediscover the equation for the binary pulsar system PSR J0737-3039A. We preprocess the time of arrival data from the Commonwealth Scientific and Industrial Research Organisation (CSIRO) Australia Telescope Facility and extract circular motion residuals as inputs and target for AI Feynman, embedding the periodicity of the data as observational and inductive biases. 
+% In this work, we propose an extension to AI Feynman, enabling it to automatically embed observational biases by preprocessing astronomical datasets to multiple coordinate systems relative to the bodies and their barycentres in the system. In addition, the extension automatically performs dimensionality reduction on the datasets corresponding to each coordinate system using principal component analysis. This extension automates the manual techniques presented in recent work \cite{Khoo2023.1}, presenting the resulting equations in a combined Pareto frontier ordered by accuracy and parsimony.
+
+\section{Background}
+
+\subsection{Astronomical Coordinate Systems}
+
+Various coordinate systems are used to record positions of celestial bodies in astronomical research, and are specified by their origin and their basis.
+
+\subsubsection{Angular Coordinates}\label{sec:angcoord}
+Angular coordinate systems define the celestial position of a body by the relative angle between a reference point, reference plane(s), and the body.
+
+\emph{The Horizontal System} defines coordinates in terms of an observer on the Earth's surface, and a plane tangent to the Earth's surface passing through the observer. \\The first angular coordinate is the Altitude, the angle between the observer and the body from the reference plane. The second angular coordinate is the Azimuth, the clockwise angle from the North pole to the body. This system is dependent on the position of the observer and the time of measurement, and thus is unsuitable for describing observer-independent celestial coordinates.\cite{Karttunen2016-gt}
+
+\emph{The Equatorial System} is a geocentric system similar to a projection of Earth's longitude (great circles around the Earth marking the East-West position) and latitude lines (circles around the Earth parallel to the equator, marking the North-South position), where coordinates are defined in terms of the celestial equator (an abstract projection of the Earth's equator) and the ecliptic plane (the orbital plane of Earth around the Sun). The first angular coordinate is the Right Ascension, the angle between the body and the Vernal Equinox on the ecliptic plane measured along the celestial equator, corresponding to the longitude. The second angular coordinate is the Declination, the angular separation of the body from the equatorial plane, corresponding to the latitude.\cite{Karttunen2016-gt}
+
+% \emph{The Galactic Coordinates} are defined with respect to the centre of the Sun and the galactic plane of the Milky Way. The first angular coordinate, Galactic Longitude, is analogous to Right Ascension, measured counter-clockwise from the direction to the galactic centre. The second angular coordinate, the Galactic Latitude, is the angular separation of the body from the galactic plane, similar to Declination.\cite{Karttunen2016-gt}
+
+\subsubsection{Rectilinear Coordinates}
+Rectilinear or Cartesian coordinate systems define celestial positions using a reference point (origin) and three coordinate axes corresponding to the three spatial dimensions. Common origin points include the barycentre of the solar system or the galaxy. \cite{Karttunen2016-gt}
+
+\subsubsection{Canonical Coordinates}
+A canonical coordinate system is defined as a coordinate system in which the equations governing the dynamics of a system are expressed in a standard, simplified form that minimises computational and symbolic complexity.
+
+One common canonical coordinate system in astronomy is the barycentric coordinate system, where the origin is set at the centre of mass (barycentre) of a gravitationally interacting system, such as a planetary system. This system is advantageous because it allows for simplification of the equations governing orbital motion by reducing the relative accelerations and gravitational interactions to those acting directly on each mass from this central point. 
+
+\subsection{Equation of the Centre} \label{EqnOfCentreSection}
+In Keplerian motion, a body in orbit around another follows an elliptical, periodic path. The Equation of the Centre describes the angular difference between a uniform circular orbit and a Kepler elliptical orbit. More formally, it refers to the difference between the \textit{mean anomaly} corresponding to the angular distance in a uniform circular orbit, and the \textit{true anomaly} corresponding to the angular distance in a Keplerian orbit.
+
+This inequality, caused by the elliptical shape of the moon's orbit, may be expressed as a series using Bessel functions of the first kind as a function of eccentricity, as shown in equation \eqref{eqnofcentre} \cite{brown1896introductory}:
+
+\begin{equation} \label{eqnofcentre}
+v - M = 2 \sum_{s = 1}^{\infty}\frac{1}{s} \left\{ J_s(se) + \sum_{p = 1}^{\infty} \beta^{p} (J_{s-p}(se) + J_{s+p}(se)) \right\} \sin{sM}\\
+\end{equation}
+
+This can be simplified to equation \ref{eqnofcentresimplified}\\
+\begin{equation}\label{eqnofcentresimplified}
+v - M = \left(2e - \frac{1}{4}e^3 + \frac{5}{96}e^5 + \frac{107}{4608}e^7\right) \sin{M}  + ...
+\end{equation}
+
+Where
+\begin{align*}
+    v & \text{ is the true anomaly}\\
+    M & \text{ is the mean anomaly}\\
+    J_n & \text{ are the Bessel functions} \\
+    \beta &= \frac{1}{e}\left(1 - \sqrt{1 - e^2}\right) \\
+    e & \text{ is the eccentricity of the orbit}
+\end{align*}
+
+% \subsection{Kepler's Second Law}
+% Kepler's second law of planetary motion states that the radius vector of a planet sweeps out equal areas in equal time intervals during its elliptical orbit around the Sun. This can be explicitly expressed as shown in equation \eqref{keplers2ndlaw}. \cite{kepler1609astronomia}
+% \begin{equation} \label{keplers2ndlaw}
+% \dot{B} = \frac{1}{2}h = \frac{1}{2}\sqrt{GMl}
+% \end{equation}
+
+% Where
+% \begin{align*}
+%     \dot{B} &\text{ is the radius vector spanning from the sun to the orbiting body}\\
+%     h &\text{ is the angular momentum per unit mass of the orbiting body}\\
+%     l &\text{ is the semi-latus rectum of the orbit}\\
+%     M &\text{ is the mass of the sun}\\
+%     G &= 6.67 \times 10^{-11}~ \si{N.m^2.kg^{-2}}
+% \end{align*}
+
+\subsection{Lunar Perturbations}\label{sec:lunpert}
+
+The Moon follows a Keplerian elliptical orbit. Lunar perturbations are deviations from a uniform circular orbit of the Moon around Earth. They can be further classified into \emph{inequalities}, which are specific periodic lunar perturbations that affect the right ascension of the Moon, the celestial equivalent of the longitude (\ref{sec:angcoord}). The Equation of the Centre, as discussed in section \ref{EqnOfCentreSection}, is an example of a lunar inequality.\\
+Other prominent lunar inequalities include \emph{evection, variation, annual equation, parallactic inequality, latitude inequality,} and \emph{reduction to the ecliptic}.
+
+\textbf{Evection}
+Periodic variations of the eccentricity and the right ascension of the lunar perigee (the point closest to Earth) caused by the sun's gravitational effect. The value of this period is observed to be approximately 31.8 days. \cite{brown1896introductory}
+
+\textbf{Variation}
+Describes the semi-monthly acceleration of the moon (around the full and new moons) accounting for a surplus of $106.36^{\circ}$  \cite{1967PASP...79..482T}.
+
+\textbf{Annual Equation}
+The expansion of the Moon's orbit when the Earth is at its perihelion (the point closest to the sun) in January due to the gravitational effects of the sun, with a period of one year. Its coefficient (in parallax) is observed to be $1.19 \times 10^{-5}$\cite{brown1896introductory}
+
+\textbf{Latitude Inequality}
+The mean motion of the node (the intersection of the lunar orbit with the ecliptic plane) in the opposite direction to the orbit, with an observed period of 6794.4 days (about 18.5 years).\cite{brown1896introductory}
+
+\textbf{Parallactic Inequality}
+Caused by the non-zero parallax of the sun, its effect is to distort the variational curve of the orbit towards the sun. Its coefficient in longitude is $0.03^\circ$, and is periodic with a period of one mean synodic month. The coefficient of its principal term is found to be $8.71^{\circ}$\cite{brown1896introductory}
+
+\textbf{Reduction to the Ecliptic}
+A variation in the ecliptic longitude of the lunar orbit caused due to the inclination of the orbit with respect to the ecliptic. This causes the perigee to precess in the direction of orbital motion with a period of 8.85 years.
+
+\subsubsection{Causes of Perturbations} 
+
+There are three main causes of these perturbations:
+
+\emph{Apsidal Precession} is the gradual rotation of the apsidal line, which is the major axis of orbit from the perigee to the apogee. This changes the timing of the perigee and apogee with a 8.85 year cycle. It does not change the overall shape of the orbit.
+
+\emph{Nodal precession} is the gradual rotation of the orbital plane around the rotational axis caused by Earth's oblateness. It changes the orientation of the lunar orbital plane with the ecliptic with a cycle of 18.6 years. It also leads to variations in the strength of the tides. This has a minor effect on the major axis of the orbit, but does not change the overall shape of the orbit.
+
+\emph{Gravitational tides} are the stretching of a body due to the gravitational force of another body. The sun's gravity stretches the Earth, which leads to a difference in gravitational pull on the moon over its orbit, which leads to an elliptical orbit. This also causes a small true libration effect.
+
+\section{Related Work}
+\subsection{Classical Symbolic Regression}
+The main goal of symbolic regression is to find an analytic expression for an unknown function $f(\cdot)$ that maps the $d$-dimensional input $x \in \mathbb{R}^d$ to the target variable $y \cong f(x) \in \mathbb{R}$ given a dataset of observations $\{x_i, y_i\}_{i=1}^{N}$ \cite{makke2023interpretablescientificdiscoverysymbolic}. However, finding equations that capture datasets is a combinatorial challenge; the sheer number of combinations of operators and operands makes a brute-force approach computationally unfeasible \cite{Karniadakis}. There exist many techniques for symbolic regression, but they can be broadly divided into three main classes: expression tree-based, regression-based, and physics- or mathematics-informed \cite{makke2023interpretablescientificdiscoverysymbolic}.
+
+Expression tree-based methods are often based on paradigms like genetic programming \cite{makke2023interpretablescientificdiscoverysymbolic}, where models can discover the form and coefficients of the equation by representing approximate candidate solutions using an expression tree-like data structure. Transition functions, like random recombination or permutation, are iteratively applied to generate new candidate solutions, while candidate solutions with low 'fitness' - some desired objective function - are dropped from the model.\cite{oh2023geneticprogrammingbasedsymbolic}
+
+Regression-based methods, on the other hand, search for the coefficients of a fixed prespecified basis that minimise error. As the size of the basis increases, the accuracy of the function may increase, but the form of the solution may grow less parsimonious.\cite{makke2023interpretablescientificdiscoverysymbolic}
+
+\subsection{Physics-Informed Symbolic Regression}
+Physics-informed symbolic regression methods leverage simplifying properties derived from physics, like symmetry and separability to limit the search space and find parsimonious and accurate solutions along the Pareto frontier, which represents the solutions with the best trade-offs between parsimony and accuracy of the solution to the system in question. The introduction of simplifying physical properties generally takes three forms of biases \cite{Khoo2023.1}: observational bias, learning bias, and inductive bias. Observational biases are introduced through the selection of data augmentation and transformation techniques for the data to embody underlying physical principles \cite{Karniadakis}. Learning biases include the choice of appropriate loss functions, hyperparameters, and learning algorithms that guide the model toward physically meaningful solutions. Inductive biases are the inherent assumptions built into the architecture of the model such that predicted solutions are guaranteed to satisfy a set of physical conditions and laws. There are various techniques that have been shown to be effective for physics-informed symbolic regression.
+
+\subsubsection{SINDy}\label{sec:sindy}
+\emph{Sparse Identification of Non-Linear Dynamics} \cite{Brunton2016} leverages the sparsity of key terms in physical systems, using sparsity techniques for efficient identification of relevant terms in the model. This promotes parsimony and avoids overfitting. The method involves collecting state data and its derivatives (possibly approximated numerically), adding noise for robustness, and constructing a library of candidate non-linear functions for each state variable. A sparse regression technique, like LASSO, is then applied to determine the coefficients that identify the important terms within the model. Domain knowledge can further guide the selection of non-linear functions, and help exploit other simplifying properties. SINDy has been shown to be effective in recovering accurate models for chaotic systems like the Lorenz system and vortex shedding, demonstrating robustness to noise and even the absence of direct derivative measurements. However, challenges remain in choosing the most suitable measurement coordinates and the optimal basis of the sparsifying function.
+
+\subsubsection{Graph Neural Networks \& PySR}\label{sec:gnn}
+\emph{Lemos et al} \cite{Lemos2023} demonstrate the utility of embedding inductive biases in rediscovering Newton's Law of Gravitation from trajectory data of solar system objects. First, a graph neural network is used to simulate the dynamics of solar system objects from 30 years of trajectory data, with the positions and velocities of the bodies represented as nodes, and physical interactions as edges between these nodes. Inductive biases, such as translational invariance, rotational invariance, and Newton's laws of motion were embedded through data augmentation and the multiplicative relationship between the node and its acceleration. This promoted candidate solutions that were aligned with existing known physical laws. Then, an open-source analogue of Eureqa (implemented in the \lstinline{PySR} library) was used to discover analytical expressions for the learned simulator, where a tree search algorithm was used to produce a set of candidate functions, which were evaluated using a score corresponding to the ratio between accuracy and parsimony. This two-step method has been shown to be effective and efficient in discovering analytic equations corresponding to Newton's Law of Gravitation. The authors identify the implementation of the method using Bayesian Neural Networks to model the masses in the system as an avenue for future exploration. The authors further identify the evaluation score for the candidate solutions as a limitation, emphasising that it may not align with what a physicist may identify as a 'good' equation.
+
+\subsubsection{AI Feynman}
+\emph{AI Feynman} \cite{Udrescu2020} utilises neural networks to identify simplifying physical properties within the data. This approach addresses the limitations of techniques like genetic algorithms and sparse regression, which might struggle to capture these underlying principles. In this regard, AI Feynman outperforms the techniques discussed in sections \ref{sec:sindy} and \ref{sec:gnn}. It incorporates six assumptions about the underlying function, including known physical units of variables, low-order polynomial structures, smoothness, composition, symmetry, and separability. The core algorithm works recursively, first employing dimensional analysis to reduce data complexity and then fitting polynomials and exploring increasingly complex expressions through brute force. Additionally, AI Feynman uses neural networks to identify specific transformations like symmetry, separability, and variable equality, allowing for a more efficient decomposition of the problem into simpler sub-problems with fewer variables. This focus on decomposability is a key improvement over methods like Eureqa. Khoo et al \cite{Khoo2023.1} have demonstrated the effectiveness of AI Feynman with embedded observational and inductive biases in recovering the orbital equation of Mars from the Rudolphine tables.
+
+\section{Methodology}
+This section introduces the experimental setup, including the dataset and its preprocessing and augmentation, and the techniques used to introduce observational and inductive bias to help AI Feynman rediscover the equations of lunar motion from the lunar orbital data. The experiments were subsequently evaluated on their ability to recover equations \eqref{eqnofcentre} and \eqref{eqnofcentresimplified}.
+% This section introduces the experimental setup, including the generation of synthetic datasets representative of realistic orbital conditions, and the techniques used to introduce observational biases to help AI Feynman recover parsimonious and accurate equations. The experiments were subsequently evaluated on their ability to recover the equations corresponding to the synthetic datasets. 
+
+% \subsection{Dataset 1}
+
+% This subsection explains the first dataset, the preprocessing and augmentation techniques used by the extension, and the experiments conducted on the processed data.
+
+% \subsubsection{Data Processing}\hfill\\
+% \textbf{Dataset}\\
+% \begin{figure}[H]
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{synthetic_dataset_1.png}
+%     \caption{Visualisation of Synthetic Dataset 1}
+%     \label{fig:ds1}
+% \end{figure}
+% The dataset is a simulation of two light bodies and a third massive body in circular coplanar orbits of different sizes around a common fixed point. This is analogous to a system of two planets and their star orbiting a common point, where the line of sight is perpendicular to the orbital plane below the system. It was generated from the following equations:\\
+
+% \textbf{Body 1:}
+% \begin{equation}
+% x_1 = r \times \cos \left(\frac{2\pi t}{|T|} \right)\\
+% \end{equation}
+% \begin{equation}
+% y_1 = r \times \sin \left(\frac{2\pi t}{|T|} \right)\\
+% \end{equation}
+% \begin{equation}
+% z_1 = 1500
+% \end{equation}
+
+% \textbf{Body 2:}\\
+% \begin{equation}
+% x_2 = \frac{r}{2} \times \cos \left(\frac{2\pi t}{|T|}  + \frac{2\pi}{3}\right)
+% \end{equation}
+% \begin{equation}
+% y_2 = \frac{r}{2} \times \sin \left(\frac{2\pi t}{|T|}  + \frac{2\pi}{3}\right)
+% \end{equation}
+% \begin{equation}
+% z_2 = 1500
+% \end{equation}
+
+% \textbf{Body 3}\\
+% \begin{equation}
+% x_3 = \frac{r}{100} \times \cos \left(\frac{2\pi t}{|T|}  + \frac{4\pi}{3}\right)
+% \end{equation}
+% \begin{equation}
+% y_3 = \frac{r}{100} \times \sin \left(\frac{2\pi t}{|T|}  + \frac{4\pi}{3}\right)
+% \end{equation}
+% \begin{equation}
+% z_3 = 0
+% \end{equation}
+
+% A mass ratio of $10:1:100$ was used. Gaussian noise with a mean of 0 and variance of 10 was added to each coordinate to simulate measurement uncertainty in the dataset.\\\\
+% $x_i, y_i, z_i$ refer to the coordinates for the $\nth{i}$ body.\\
+% $r$ refers to the radius of the orbit.\\
+% $t$ refers to individual timestamps.\\
+% $|T|$ refers to the total number of timestamps.\\\\
+% \textbf{Preprocessing}\\\\
+% The extension function processes the positions of three bodies in a 3D space over time, given their masses. The following steps are performed:
+% \begin{enumerate}
+%     \item The barycentre of the system and the pairwise barycentres for each pair of bodies are computed.
+%     \item The positions of the bodies relative to each other as well as the computed barycentres are calculated and stored as augmented datasets.
+%     \item The two-dimensional principal components are calculated for each of the augmented datasets using the \lstinline{sklearn} library and appended to their respective datasets.
+% \end{enumerate}
+% The augmented datasets embody different coordinate systems to embed different observational biases and thus find the most parsimonious solutions corresponding to the canonical coordinate system for the dataset.
+
+% \subsubsection{Experimental Setup}
+
+% We conduct eight experiments with different datasets (the original and the seven augmented datasets) as inputs and a constant target variable for AI Feynman, corresponding to the inclusion of different observational biases to the inclusion of different observational biases in the form of coordinate systems, as shown in Table \ref{tab:vartable1}.
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Input Variable(s)} & \textbf{Target Variable} & \textbf{Origin}\\\hline
+%          1 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3$ & Distance between Body 1 and 3 & Original\\\hline
+%          2 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Body 1\\\hline
+%          3 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Body 2\\\hline
+%          4 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Body 3\\\hline
+%          5 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Overall Barycentre\\\hline
+%          6 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Barycentre of Bodies 1 \& 2\\\hline
+%          7 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Barycentre of Bodies 2 \& 3\\\hline
+%          8 & $t, x_1, y_1, z_1, x_2, y_2, z_2, x_3, y_3, z_3, PC_1, PC_2$ & Distance between Body 1 and 3 & Barycentre of Bodies 1 \& 3\\\hline
+%     \end{tabular}
+%     \caption{Input \& Target Variables for AI Feynman for Lunar Orbit}
+%     \label{tab:vartable1}
+% \end{table}
+
+% $x_i, y_i, z_i$ refer to the coordinates for the $\nth{i}$ body.
+% $PC_i$ refer to the $\nth{i}$ principal component.\\
+
+% The measure of fit places a logarithm-scaled penalty on the absolute loss.
+% The measure of parsimony places a logarithm-scaled penalty on real numbers,
+% variables and operators in an equation\cite{Khoo2023.1}. These measures are used to compare solutions generated along the Pareto frontier for the experiments described in Table \ref{tab:vartable1}.
+
+\subsection{Data Preprocessing}\hfill
+
+\textbf{Dataset:} Geocentric lunar ephemeris data from between 2024-01-01 00:00:00 and 2025-01-01 00:00:00 with a step size of 60 minutes was obtained from NASA JPL's Horizons System. The relevant features of the dataset include the datetime, right ascension (in hours-minutes-seconds of time), declination (in degrees-minutes-seconds of arc), and delta (the geocentric distance to the Moon in AU)\\
+
+\textbf{Preprocessing:} The data were downloaded as a text file, and converted to a Pandas Dataframe. Thereafter, the equatorial coordinates (right ascension and declination) were converted to radians, and the ecliptic coordinates (longitude and latitude) were calculated in degrees using the Right Ascension and Declination values and AstroPy's in-built \lstinline{transform_to} method.
+
+For both the coordinate systems, principal component analysis was performed using the \lstinline{sklearn} library to obtain equatorial and ecliptic planar coordinates. This is an observational bias where the planarity of the lunar orbit is introduced directly through the choice of reference frame.
+
+The data for the individual anomalistic (apogee to apogee) lunar cycles were isolated by determining the timestamps of the maxima in the planar coordinate values, and assigning the data points corresponding cycle numbers, for a total of 14 unique cycles. This is an observational bias where the periodicity of the lunar orbit is used to simplify the dataset.
+
+Finally, the true anomaly, mean anomaly, and residuals were calculated for the moon for each lunar cycle using the planar coordinates. The mean anomalies were calculated by finding the time since the perigee for each point in the cycle and normalising the time since the perigee by the total time of the cycle. The true anomalies were calculated iteratively using Kepler's first and second laws \cite{brown1896introductory}. The circular motion residuals, which correspond to the difference between an idealised uniform circular orbit and a Keplerian orbit, were calculated by subtracting the mean anomalies from the true anomalies.
+
+\subsection{Experimental Setup}\label{sec:expSetupLunar}
+
+We conduct two experiments with different combinations of inputs for AI Feynman, corresponding to the inclusion of different observational biases and inductive bases as shown in Table \ref{tab:vartablelunar}.
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}\hline
+         &\textbf{Input Variable(s)} & \textbf{Target Variable} & \textbf{Search Space Bias} \\\hline
+         1 & $M$ & Circular motion residuals & All Functions \\\hline
+         2 & $M$ & Circular motion residuals & Trigonometric Functions \\\hline
+         3 & $\sin{(M)}, \sin{(2M)}, \sin{(3M)} $ & Circular motion residuals & Trigonometric Functions \\\hline
+    \end{tabular}
+    \caption{Input \& Target Variables for AI Feynman for Lunar Orbit}
+    \label{tab:vartablelunar}
+\end{table}
+
+($M$ corresponds to the mean anomaly)\\
+
+The first experiment applies AI Feynman directly without biases. The second experiment is inductively biased where the increased bias of AI Feynman's search space towards trigonometric functions embodies the periodic nature of the orbit. The third experiment also directly embeds an observational bias corresponding to the periodicity of the orbit through the augmentation of the dataset. Thus, the modifications to embed observational biases inform AI Feynman of the periodicity of the lunar orbit and the trigonometric nature of the mean anomaly, replacing it with the sine of mean anomaly.
+
+The measure of fit places a logarithm-scaled penalty on the absolute loss.
+The measure of parsimony places a logarithm-scaled penalty on real numbers,
+variables and operators in an equation\cite{Khoo2023.1}. These measures are used to compare solutions generated along the Pareto frontier for the experiments described in Table \ref{tab:vartablelunar}.
+% \subsection{Pulsar System}
+
+% This subsection explains the dataset used for the binary pulsar data, the preprocessing and augmentation techniques used, and the experiments conducted on the processed data.
+
+% \subsubsection{Data Preprocessing}\hfill\\
+% \textbf{Dataset:} The observed data of PSR J0737-3039A, a binary pulsar system, were obtained from the CSIRO Australia Telescope National Facility \cite{burgay2012parkes}. The data comprise of observations between 2012-03-04 06:54:34 and 2012-03-04 09:24:04. The only relevant feature of the data is the time of arrival of the radiation wave to the observer (in MJD).\\
+
+% \textbf{Preprocessing:} The data were downloaded as a tim file. The timestamps were converted to seconds and subtracted from the first timestamp to obtain a time series labelled \emph{TOA}. The differences between successive TOA values (in seconds) were calculated and labelled \emph{Difference in TOA}.
+% Thereafter, theta ($\theta$) values were obtained by normalising the TOA within the range of $0$ to $2\pi$. %This introduces an observational bias where the periodicity of the data is used.
+% Finally, the theta values were fit to the equation of a circle and the residuals were calculated. %This is an observational bias to embody the equation of the centre \eqref{eqnofcentre}.
+
+% \subsubsection{Experimental Setup}
+
+% We conduct three experiments with different combinations of input and target variables for AI Feynman, corresponding to the inclusion of different observational biases and coordinate bases as shown in Table \ref{tab:vartablepulsar}.
+
+% \renewcommand{\arraystretch}{1.5}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Input Variable(s)} & \textbf{Target Variable} & \textbf{Search Space Bias}\\\hline
+%          1 & $\theta$ & Circular motion residuals & All Functions \\\hline
+%          2 & $\theta$ & Circular motion residuals & Trigonometric Functions \\\hline
+%          3 & $\sin\theta, \cos\theta$ & Circular motion residuals & Trigonometric Functions \\\hline
+%     \end{tabular}
+%     \caption{Input \& Target Variables for AI Feynman for Binary Pulsar}
+%     \label{tab:vartablepulsar}
+% \end{table}
+
+% The first experiment is not observationally or inductively biased. The second experiment is inductively biased where the increased bias of AI Feynman's search space to trigonometric functions embodies the periodic nature of the orbit. The third experiment is both inductively as well as observationally biased, where the replacement of the angular values with their sines and
+% cosines as well as the aforementioned increased bias of the search space to trigonometric functions embeds the periodicity of the system and the trigonometric nature of the data.
+
+% The measures of fit and parsimony used to evaluate the results of the experiments in Table \ref{tab:vartablepulsar} are the same as section \ref{sec:expSetupLunar}.
+
+\section{Performance Evaluation}
+
+The solutions along the Pareto frontier are reported in column 2 of tables \ref{tab:lunarExp1}, \ref{tab:lunarExp2}, and \ref{tab:lunarExp3}. $M$ indicates the mean anomaly. All solutions were simplified; those that evaluated to constants independent of the input variable were discarded.\\
+
+\textbf{Experiment 1}
+\renewcommand{\arraystretch}{3}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}\hline
+         &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+         1a & $\frac{M}{M^2+M+1}-0.2$ & 24.0474 & 17.9316 \\\hline
+         1b & $\frac{M}{M^2+2}-0.22$ & 23.0438 & 20.5344 \\\hline
+         1c & $\frac{2M}{M^2+2}-0.877$ & 26.091250 & 23.02309 \\\hline
+    \end{tabular}
+    \caption{AI Feynman Solutions for Lunar Experiment 1}
+    \label{tab:lunarExp1}
+\end{table}
+
+\textbf{Experiment 2}
+\renewcommand{\arraystretch}{3}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}\hline
+         &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+         2a & $-\arctan(0.2M)$ & 26.4463 & 15.9315 \\\hline
+         2b & $-0.4M$ & 26.0228 & 11.3219 \\\hline
+    \end{tabular}
+    \caption{AI Feynman Solutions for Lunar Experiment 2}
+    \label{tab:lunarExp2}
+\end{table}
+
+\textbf{Experiment 3}
+\renewcommand{\arraystretch}{3}
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}\hline
+         &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+         3a & $0.1095\sin M$ & 25.8333 & 4.3114 \\\hline
+         3b & $0.1142857\sin(M)$ & 25.3271 & 7.9773 \\\hline
+         3c & $0.1146627\sin(M)$ & 25.3483 & 7.9921 \\\hline
+         3d & $0.52524 \sin(M)\left(\sqrt{\sqrt{\sin(M)+2}}+1\right)$ & 25.2808 & 62.7726 \\\hline
+    \end{tabular}
+    \caption{AI Feynman Solutions for Lunar Experiment 3}
+    \label{tab:lunarExp3}
+\end{table}
+
+We observe that none of the equations in experiments 1 and 2 match the expected form of the Equation of the Centre, neither \eqref{eqnofcentre} nor \eqref{eqnofcentresimplified}. In experiment 3, we note that when the observational bias of the trigonometric nature of the mean anomaly is embedded, we observe equations symbolically similar to the first-order term of the equation \eqref{eqnofcentresimplified}. We observe that by comparing the coefficient of $\sin(M)$ in $\eqref{eqnofcentresimplified}$ and 3A - 3C, we obtain estimates of 0.0547705, 0.057354933682, and 0.0571662 for the eccentricity of the lunar orbit, all of which are remarkably close to the average observed lunar eccentricity of 0.0549 \cite{brown1896introductory}, with equation 3A having the least deviation of $0.235$ per cent between the true value of eccentricity and the eccentricity estimate obtained from AI Feynman. Thus, equation 3A corresponds to the first-order form of the Equation of the Centre \eqref{eqnofcentresimplified}.
+
+% \renewcommand{\arraystretch}{3}
+% \textbf{Experiment 2}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          1.2a&$-\frac{2.3800641 C_{Eq}}{100000(C_{Eq}^2 + 1)}$&50.24309&14.60852 \\\hline
+%          1.2b&$\frac{0.000023800641(1- C_{Eq})}{C_{Eq}^2 + 1}$ & 52.24309 & 14.30905 \\\hline
+%          1.2c & $\tan{\left(\frac{0.000023800641(1- C_{Eq})}{C_{Eq}^2 + 1} \right)}$ & 56.38480 & 14.30905 \\\hline
+%          1.2d & $\frac{2.3800641 - 2.3800641 C_{Eq}}{100000(C_{Eq}^2 + 1)}$ & 81.39144 & 14.26359 \\\hline
+%          1.2e & $\tan{\left(\frac{2.3800641 - 2.3800641 C_{Eq}}{100000(C_{Eq}^2 + 1)}\right)}$ & 81.39144 & 14.26359 \\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Lunar Experiment 2}
+%     \label{tab:lunarExp2}
+% \end{table}
+
+% \textbf{Experiment 3}
+% \renewcommand{\arraystretch}{3.5}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          1.3a & $0.000004341863C_{Eq}$ & 30.69374 & 14.24546 \\\hline
+%          1.3b & $\tan{(0.000004341863C_{Eq})}$ & 33.44863 & 14.24546 \\\hline
+%          1.3c & $\frac{2.31398C_{Eq}\left(1-C_{Eq}\right)}{1000000}$ & 34.54069 & 14.05500 \\\hline
+%          1.3d & $\frac{5.307793C_{Eq}\left(1-C_{Eq}\right)}{1000000}$ & 35.73842 & 13.80009\\\hline
+%          1.3e & $\tan\left(\frac{5.307793C_{Eq}\left(1-C_{Eq}\right)}{1000000}\right)$ & 38.98354 & 13.80009\\\hline
+%          1.3f & $\frac{1.140973\left(1-C_{Eq}^2\right)}{100000}$ & 69.76020 & 13.62113\\\hline
+%          1.3g & $\frac{3.2245116\left(1- |C_{Eq}|\right)}{100000}$ & 74.75783 & 12.99042 \\\hline
+%          1.3h & $\frac{5.9633934\left(1- \sqrt[4]{C_{Eq}^2}\right)}{100000}$ & 77.53194 & 12.86079 \\\hline
+%          1.3i & $-\arctan\left(\frac{5.9633934\left(1- \sqrt[4]{C_{Eq}^2}\right)}{100000}\right)$ & 86.04171 & 12.86079 \\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Lunar Experiment 3}
+%     \label{tab:lunarExp3}
+% \end{table}
+
+% \textbf{Experiment 4}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          1.4a & $0.010616794701C_{Ec}^2$ & 39.731827 & 29.90276 \\\hline
+%          1.4b & $\arctan(0.002630151914C_{Ec})$ & 42.69124 & 29.55462 \\\hline
+%          1.4c & $\arcsin\left(\frac{1}{C_{Ec}}-0.638517273404\right)$ & 60.46943 & 26.24588 \\\hline
+%          1.4d & $\arcsin\left(\frac{0.634633883951(2 - C_{Ec})}{C_{Ec}}\right)$ & 61.04559 & 26.23181 \\\hline
+%          1.4e & $5.557288203656 - \sqrt[8]{C_{Ec}}$ & 61.32122 & 25.34278\\\hline
+%          1.4f & $5.560536238455 - \sqrt[8]{C_{Ec} + 1}$ & 70.17682 & 25.27978\\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Lunar Experiment 4}
+%     \label{tab:lunarExp4}
+% \end{table}
+
+% \textbf{Experiment 5}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          1.5a & $0.0001295044C_{Ec}^2$ & 39.93429 & 30.011553 \\\hline
+%          1.5b & $\arcsin(0.002604231743C_{Ec})$ & 42.67695 & 28.87039 \\\hline
+%          1.5c & $5.546635984618 - \sqrt[8]{C_{Ec}}$ & 61.31846 & 25.46174 \\\hline
+%          1.5d & $\arcsin \left(-2.351606454528 +\sqrt[8]{C_{Ec}}\right)$ & 65.93524 & 24.69202 \\\hline
+%          1.5e & $\arcsin \left(-\frac{5.720016052947\sqrt{C_{Ec}}}{C_{Ec}}\right)$ & 66.21762 & 24.33963\\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Lunar Experiment 5}
+%     \label{tab:lunarExp5}
+% \end{table}
+
+% We observe that none of the equations match the expected forms for the Equation of the Centre, neither \eqref{eqnofcentre} nor \eqref{eqnofcentresimplified}. While certain equations, like 1.1e, 1.1h, 1.1j, 1.2c, 1.2e, 1.3b, and 1.3e make use of trigonometric functions, they use $\tan(\cdot)$ and not $\sin(\cdot)$ or $\cos(\cdot)$ as expected from \eqref{eqnofcentre} or \eqref{eqnofcentresimplified}. It is also evident that even when AI Feynman was inductively biased towards trigonometric functions, as in experiments 2 to 5, the solutions along the Pareto frontier included predominantly inverse trigonometric, polynomial, and rational equations.
+
+% \subsection{Pulsar Dataset}
+
+% The solutions along the Pareto frontier are reported in column 2 of tables \ref{tab:pulsarExp1}, \ref{tab:pulsarExp2} and \ref{tab:pulsarExp3}. $\theta$ denotes the TOA values normalised to the range 0 to $2\pi$. All solutions that evaluated to constants independent of the input variable were discarded.\\
+
+% \textbf{Experiment 1}
+% \renewcommand{\arraystretch}{3}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          2.1a & $0.000065443208\sqrt{\theta+1}$ & 47.217236 & 20.49010 \\\hline
+%          2.1b & $\arcsin(0.000065443208\sqrt{\theta+1})$ & 51.11737 & 20.49009 \\\hline
+%          2.1c & $\frac{0.00533945811912417 \left(-\theta^{\frac{1}{2}}+1\right)}{\theta^2+1}$ & 62.05264 & 20.39284\\\hline
+%          2.1d & $\frac{0.00546202575787902 \left(-\theta^{\frac{1}{2}}+1\right)}{\theta^2+1}$ & 62.05264 & 20.39284\\\hline
+%          2.1e & $\frac{0.005483911967\left(-\sqrt{\theta}+1\right)}{\theta^2+1}$ & 62.09115 & 20.27890 \\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Pulsar Experiment 1}
+%     \label{tab:pulsarExp1}
+% \end{table}
+
+% \textbf{Experiment 2}
+% \renewcommand{\arraystretch}{3}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          2.2a & $\frac{0.00441\left(-\theta+1\right)}{\theta\left(\theta+1\right)+1}$ & 55.29340 & 20.37087\\\hline
+%          2.2b & $0.00011812281744\sqrt{\theta-3}$ & 56.01889 & 17.01309\\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Pulsar Experiment 2}
+%     \label{tab:pulsarExp2}
+% \end{table}
+
+% \textbf{Experiment 3}
+% \begin{table}[H]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|}\hline
+%          &\textbf{Equation} & \textbf{Measure of Fit} & \textbf{Measure of Parsimony} \\\hline
+%          2.3a & $\arcsin(0.001746979141(1 + \sin(\theta) +\sin(\theta^2)))$ & 46.50229 & 19.89002 \\\hline
+%          2.3b & $0.001746979141(1 + \sin(\theta) +\sin(\theta^2))$ & 84.69215 & 19.88357 \\\hline
+%          2.3c & $-0.00518\sin(\theta)^2+0.00259$ & 86.41616 & 19.04239 \\\hline
+%          2.3d & $0.002553834450(-\sin(\theta)^3-\sin(\theta)^2+\sin(\theta)+1)$ & 90.98235 & 18.38696\\\hline
+%     \end{tabular}
+%     \caption{AI Feynman Solutions for Pulsar Experiment 3}
+%     \label{tab:pulsarExp3}
+% \end{table}
+
+% Similar to section \ref{sec:lunarPE}, no solutions were found that matched the forms of the Equation of the Centre (\eqref{eqnofcentre} or \eqref{eqnofcentresimplified}) nor Kepler's second law \eqref{keplers2ndlaw}. Equations 2.3b and 2.3d partially match \eqref{eqnofcentresimplified} due to the $\sin$ terms. However, equation \eqref{eqnofcentresimplified} has the same power for all of the sine terms and their arguments, while the exponents of the sine terms and the arguments in 2.3b and 2.3d seem to be different.
+    
+\section{Conclusion}
+
+
+In this work, we applied the AI Feynman symbolic regression algorithm in an attempt to rediscover a fundamental equation governing lunar motion from observational data. The introduction of various observational and inductive biases corresponding to the periodicity, planarity, and trigonometric nature of the system, such as planar coordinates, restrictions to anomalistic cycles, conversion of angular inputs to their sines, and an increased bias towards the trigonometric function space were sufficient in constraining the search space such that AI Feynman was able to recover the expected first-order form of the Equation of the Centre from lunar ephemerides data, something that was previously possible only with human intuition and physical understanding.
+
+% Similarly for the pulsar dataset, while certain solutions involved sine terms partially reminiscent of lower-order approximations of the equation of the center, AI Feynman could not recover the precise form of Kepler's second law. The incorporation of observational bias through normalised angular coordinates and an inductive bias favouring trigonometric functions proved insufficient to guide AI Feynman towards the desired analytical expression.
+
+A limitation of AI Feynman was its inability to infer the canonical coordinate system from the data, resulting in physically accurate candidate solutions being dominated by more parsimonious but less accurate solutions due to the extra computation required to transform the coordinates to their canonical system. Another limitation of AI Feynman was its inability to discover higher-order terms of the Equation of the Centre \eqref{eqnofcentre}. This is likely because the magnitudes of higher-order terms of the Equation of the Centre are much smaller, similar in magnitude to other lunar inequalities (as described in section \ref{sec:lunpert}). This makes it difficult for AI Feynman to fit the higher-order terms of the Equation of the Centre without decomposing the other lunar inequality components. Further work is needed to develop more effective techniques for embedding the relevant physical principles and constraints, including the canonical coordinate system, to steer the search robustly so that higher-order terms of governing equations may be found automatically in the presence of the noise of extrinsic lunar perturbations.
+
+\newpage
+\nocite{*}
+\bibliography{sample}
+
+\end{document}
